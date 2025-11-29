@@ -263,6 +263,8 @@ class ImageViewer < Gtk::Application
       reset_zoom
     when 0x065, 0x045 # e, E
       open_external
+    when 0xff1b # Escape
+      @window.close
     else
       return false
     end
