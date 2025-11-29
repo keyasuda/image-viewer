@@ -307,6 +307,10 @@ class ImageViewer < Gtk::Application
 
   def navigate_next
     next_idx = find_next_index(@current_index)
+    unless next_idx
+      # Wrap around to beginning
+      next_idx = find_next_index(-1)
+    end
     if next_idx
       @current_index = next_idx
       show_current_image
@@ -315,6 +319,10 @@ class ImageViewer < Gtk::Application
 
   def navigate_prev
     prev_idx = find_prev_index(@current_index)
+    unless prev_idx
+      # Wrap around to end
+      prev_idx = find_prev_index(@images.size)
+    end
     if prev_idx
       @current_index = prev_idx
       show_current_image
