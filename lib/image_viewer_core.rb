@@ -81,7 +81,7 @@ module ImageViewerCore
       @current_index = 0
     end
 
-    def self.from_directory(directory, metadata = nil)
+    def self.from_directory(directory, metadata = nil, initial_file: nil)
       return new([], metadata) unless directory && File.directory?(directory)
 
       files = Dir.entries(directory)
@@ -90,6 +90,7 @@ module ImageViewerCore
 
       list = new(files, metadata)
       list.sort_by_exif_and_name
+      list.jump_to_file(initial_file) if initial_file
       list
     end
 
@@ -98,6 +99,19 @@ module ImageViewerCore
         exif_date = extract_exif_date(path)
         natural_key = natural_sort_key(File.basename(path))
         [exif_date || Time.new(9999), natural_key]
+      end
+    end
+
+    def jump_to_file(filepath)
+      return false if filepath.nil?
+
+      idx = @images.index(filepath)
+      idx ||= @images.index { |p| File.basename(p) == File.basename(filepath) }
+      if idx
+        @current_index = idx
+        true
+      else
+        false
       end
     end
 

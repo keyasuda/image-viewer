@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Image Viewer
+Comment=Simple image viewer for photo culling
+Exec=/home/user/dev/image-viewer/image_viewer.sh %f
+Icon=applications-graphics
+Terminal=false
+Categories=Graphics;Viewer;
+MimeType=image/jpeg;image/png;image/webp;image/tiff;image/bmp;

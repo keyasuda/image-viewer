@@ -13,11 +13,22 @@ class ImageViewer < Gtk::Application
   MIN_ZOOM = 0.1
   MAX_ZOOM = 10.0
 
-  def initialize(directory = nil)
+  def initialize(path = nil)
     super('com.example.imageviewer', :flags_none)
     @zoom_level = 1.0
     @fit_to_window = true
-    @directory = directory
+    @initial_file = nil
+
+    # Determine if path is a file or directory
+    if path && File.file?(path)
+      @directory = File.dirname(path)
+      @initial_file = File.expand_path(path)
+    elsif path && File.directory?(path)
+      @directory = path
+    else
+      @directory = nil
+    end
+
     @metadata = nil
     @image_list = nil
     @preloaded_pixbuf = nil
@@ -148,8 +159,8 @@ class ImageViewer < Gtk::Application
     meta_path = File.join(@directory, ImageViewerCore::META_FILE)
     @metadata = ImageViewerCore::Metadata.load_from_file(meta_path)
 
-    # Load and sort image list
-    @image_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata)
+    # Load and sort image list, jump to initial file if specified
+    @image_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata, initial_file: @initial_file)
   end
 
   def show_current_image

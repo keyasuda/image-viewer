@@ -31,8 +31,25 @@ bundle install
 # ディレクトリを指定して起動
 bundle exec ruby image_viewer.rb /path/to/image/directory
 
+# 画像ファイルを指定して起動（そのファイルから表示開始）
+bundle exec ruby image_viewer.rb /path/to/image/photo.jpg
+
 # 引数なしで起動（ディレクトリ選択ダイアログが表示される）
 bundle exec ruby image_viewer.rb
+```
+
+### Nautilusからの起動
+
+画像ファイルをダブルクリックで開けるようにするには：
+
+```bash
+# デスクトップエントリをインストール
+cp image-viewer.desktop ~/.local/share/applications/
+update-desktop-database ~/.local/share/applications/
+
+# 画像ファイルのデフォルトアプリとして設定（オプション）
+xdg-mime default image-viewer.desktop image/jpeg
+xdg-mime default image-viewer.desktop image/png
 ```
 
 ## キーボードショートカット

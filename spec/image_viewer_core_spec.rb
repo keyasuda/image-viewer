@@ -177,6 +177,45 @@ RSpec.describe ImageViewerCore::ImageList do
       list = described_class.from_directory('/non/existent/dir')
       expect(list.empty?).to be true
     end
+
+    it 'starts at specified initial file' do
+      Dir.mktmpdir do |dir|
+        FileUtils.touch(File.join(dir, 'img1.jpg'))
+        FileUtils.touch(File.join(dir, 'img2.jpg'))
+        FileUtils.touch(File.join(dir, 'img3.jpg'))
+
+        initial_file = File.join(dir, 'img2.jpg')
+        list = described_class.from_directory(dir, nil, initial_file: initial_file)
+        expect(File.basename(list.current)).to eq('img2.jpg')
+      end
+    end
+  end
+
+  describe '#jump_to_file' do
+    it 'jumps to specified file' do
+      Dir.mktmpdir do |dir|
+        FileUtils.touch(File.join(dir, 'img1.jpg'))
+        FileUtils.touch(File.join(dir, 'img2.jpg'))
+        FileUtils.touch(File.join(dir, 'img3.jpg'))
+
+        list = described_class.from_directory(dir)
+        expect(File.basename(list.current)).to eq('img1.jpg')
+
+        result = list.jump_to_file(File.join(dir, 'img3.jpg'))
+        expect(result).to be true
+        expect(File.basename(list.current)).to eq('img3.jpg')
+      end
+    end
+
+    it 'returns false for non-existent file' do
+      Dir.mktmpdir do |dir|
+        FileUtils.touch(File.join(dir, 'img1.jpg'))
+
+        list = described_class.from_directory(dir)
+        result = list.jump_to_file(File.join(dir, 'nonexistent.jpg'))
+        expect(result).to be false
+      end
+    end
   end
 end
 
