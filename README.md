@@ -64,14 +64,15 @@ bundle exec ruby image_viewer.rb
 選別状態は画像ディレクトリ内の `imgview_meta.yml` に自動保存されます：
 
 ```yaml
-status:
-  DSC0001.JPG:
-    pinned: true
-    skipped: false
-  DSC0002.JPG:
-    pinned: false
-    skipped: true
+pinned:
+- DSC0001.JPG
+- DSC0003.JPG
+skipped:
+- DSC0002.JPG
+- DSC0004.JPG
 ```
+
+テキストエディタで直接編集することも可能です。
 
 ## 対応画像形式
 

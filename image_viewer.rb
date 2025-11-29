@@ -150,12 +150,15 @@ class ImageViewer < Gtk::Application
     meta_path = File.join(@directory, META_FILE)
     if File.exist?(meta_path)
       begin
-        @metadata = YAML.safe_load_file(meta_path, permitted_classes: [Symbol]) || { 'status' => {} }
-        @metadata['status'] ||= {}
+        @metadata = YAML.safe_load_file(meta_path, permitted_classes: [Symbol]) || {}
+        @metadata['pinned'] ||= []
+        @metadata['skipped'] ||= []
       rescue StandardError => e
         warn "Failed to load metadata: #{e.message}"
-        @metadata = { 'status' => {} }
+        @metadata = { 'pinned' => [], 'skipped' => [] }
       end
+    else
+      @metadata = { 'pinned' => [], 'skipped' => [] }
     end
 
     # Get image files
@@ -258,9 +261,8 @@ class ImageViewer < Gtk::Application
 
   def update_status_label(path)
     filename = File.basename(path)
-    status = @metadata['status'][filename] || {}
-    pinned = status['pinned']
-    skipped = status['skipped']
+    pinned = @metadata['pinned'].include?(filename)
+    skipped = @metadata['skipped'].include?(filename)
 
     @status_label.remove_css_class('pinned')
     @status_label.remove_css_class('skipped')
@@ -335,17 +337,19 @@ class ImageViewer < Gtk::Application
 
   def skipped?(path)
     filename = File.basename(path)
-    status = @metadata['status'][filename]
-    status && status['skipped']
+    @metadata['skipped'].include?(filename)
   end
 
   def toggle_pinned
     return if @images.empty?
 
     filename = File.basename(@images[@current_index])
-    @metadata['status'][filename] ||= {}
-    @metadata['status'][filename]['pinned'] = !@metadata['status'][filename]['pinned']
-    @metadata['status'][filename]['skipped'] = false if @metadata['status'][filename]['pinned']
+    if @metadata['pinned'].include?(filename)
+      @metadata['pinned'].delete(filename)
+    else
+      @metadata['pinned'] << filename
+      @metadata['skipped'].delete(filename)
+    end
 
     save_metadata
     update_status_label(@images[@current_index])
@@ -355,9 +359,10 @@ class ImageViewer < Gtk::Application
     return if @images.empty?
 
     filename = File.basename(@images[@current_index])
-    @metadata['status'][filename] ||= {}
-    @metadata['status'][filename]['skipped'] = true
-    @metadata['status'][filename]['pinned'] = false
+    unless @metadata['skipped'].include?(filename)
+      @metadata['skipped'] << filename
+    end
+    @metadata['pinned'].delete(filename)
 
     save_metadata
     navigate_next || show_current_image
@@ -419,7 +424,7 @@ class ImageViewer < Gtk::Application
   end
 
   def copy_pinned_files(dest_dir)
-    pinned_files = @metadata['status'].select { |_, v| v['pinned'] }.keys
+    pinned_files = @metadata['pinned']
     copied = 0
 
     pinned_files.each do |filename|
