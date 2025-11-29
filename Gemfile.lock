@@ -11,6 +11,7 @@ GEM
     cairo-gobject (4.3.3)
       cairo (>= 1.16.2)
       glib2 (= 4.3.3)
+    diff-lcs (1.6.2)
     exif (2.2.4)
     fiddle (1.1.8)
     gdk4 (4.3.3)
@@ -49,6 +50,19 @@ GEM
     red-colors (0.4.0)
       json
       matrix
+    rspec (3.13.2)
+      rspec-core (~> 3.13.0)
+      rspec-expectations (~> 3.13.0)
+      rspec-mocks (~> 3.13.0)
+    rspec-core (3.13.6)
+      rspec-support (~> 3.13.0)
+    rspec-expectations (3.13.5)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-mocks (3.13.7)
+      diff-lcs (>= 1.2.0, < 2.0)
+      rspec-support (~> 3.13.0)
+    rspec-support (3.13.6)
 
 PLATFORMS
   ruby
@@ -57,6 +71,7 @@ PLATFORMS
 DEPENDENCIES
   exif
   gtk4
+  rspec
 
 BUNDLED WITH
    2.6.9

@@ -4,3 +4,7 @@ source 'https://rubygems.org'
 
 gem 'gtk4'
 gem 'exif'
+
+group :test do
+  gem 'rspec'
+end

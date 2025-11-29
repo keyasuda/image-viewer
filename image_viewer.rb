@@ -6,22 +6,20 @@ require 'gtk4'
 require 'exif'
 require 'yaml'
 require 'fileutils'
+require_relative 'lib/image_viewer_core'
 
 class ImageViewer < Gtk::Application
-  SUPPORTED_EXTENSIONS = %w[.jpg .jpeg .png .webp .tiff .tif .bmp].freeze
-  META_FILE = 'imgview_meta.yml'
   ZOOM_STEP = 0.1
   MIN_ZOOM = 0.1
   MAX_ZOOM = 10.0
 
   def initialize(directory = nil)
     super('com.example.imageviewer', :flags_none)
-    @images = []
-    @current_index = 0
     @zoom_level = 1.0
     @fit_to_window = true
-    @metadata = { 'status' => {} }
     @directory = directory
+    @metadata = nil
+    @image_list = nil
     @preloaded_pixbuf = nil
     @preload_index = nil
 
@@ -147,65 +145,21 @@ class ImageViewer < Gtk::Application
     return unless @directory
 
     # Load metadata
-    meta_path = File.join(@directory, META_FILE)
-    if File.exist?(meta_path)
-      begin
-        @metadata = YAML.safe_load_file(meta_path, permitted_classes: [Symbol]) || {}
-        @metadata['pinned'] ||= []
-        @metadata['skipped'] ||= []
-      rescue StandardError => e
-        warn "Failed to load metadata: #{e.message}"
-        @metadata = { 'pinned' => [], 'skipped' => [] }
-      end
-    else
-      @metadata = { 'pinned' => [], 'skipped' => [] }
-    end
+    meta_path = File.join(@directory, ImageViewerCore::META_FILE)
+    @metadata = ImageViewerCore::Metadata.load_from_file(meta_path)
 
-    # Get image files
-    @images = Dir.entries(@directory)
-                 .select { |f| SUPPORTED_EXTENSIONS.include?(File.extname(f).downcase) }
-                 .map { |f| File.join(@directory, f) }
-
-    # Sort by EXIF date then natural sort
-    @images.sort_by! do |path|
-      exif_date = extract_exif_date(path)
-      natural_key = natural_sort_key(File.basename(path))
-      [exif_date || Time.new(9999), natural_key]
-    end
-
-    @current_index = 0
-  end
-
-  def extract_exif_date(path)
-    return nil unless %w[.jpg .jpeg .tiff .tif].include?(File.extname(path).downcase)
-
-    begin
-      data = Exif::Data.new(File.open(path))
-      date_str = data.date_time_original || data.date_time
-      return nil unless date_str
-
-      # Parse EXIF date format: "YYYY:MM:DD HH:MM:SS"
-      Time.strptime(date_str.to_s, '%Y:%m:%d %H:%M:%S')
-    rescue StandardError
-      nil
-    end
-  end
-
-  def natural_sort_key(filename)
-    # Split filename into numeric and non-numeric parts for natural sorting
-    filename.downcase.split(/(\d+)/).map do |part|
-      part.match?(/\d+/) ? part.to_i : part
-    end
+    # Load and sort image list
+    @image_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata)
   end
 
   def show_current_image
-    return if @images.empty?
+    return if @image_list.nil? || @image_list.empty?
 
-    path = @images[@current_index]
+    path = @image_list.current
     return unless File.exist?(path)
 
     begin
-      if @preload_index == @current_index && @preloaded_pixbuf
+      if @preload_index == @image_list.current_index && @preloaded_pixbuf
         pixbuf = @preloaded_pixbuf
       else
         pixbuf = GdkPixbuf::Pixbuf.new(file: path)
@@ -235,12 +189,12 @@ class ImageViewer < Gtk::Application
   end
 
   def preload_next_image
-    next_idx = find_next_index(@current_index)
+    next_idx = @image_list.find_next_index(@image_list.current_index)
     return if next_idx.nil? || next_idx == @preload_index
 
     Thread.new do
       begin
-        path = @images[next_idx]
+        path = @image_list.images[next_idx]
         @preloaded_pixbuf = GdkPixbuf::Pixbuf.new(file: path)
         @preload_index = next_idx
       rescue StandardError
@@ -252,7 +206,7 @@ class ImageViewer < Gtk::Application
 
   def update_info_bar(path, pixbuf)
     filename = File.basename(path)
-    position = "#{@current_index + 1}/#{@images.size}"
+    position = "#{@image_list.current_index + 1}/#{@image_list.size}"
     dimensions = "#{pixbuf.width}x#{pixbuf.height}"
     zoom_info = @fit_to_window ? 'Fit' : "#{(@zoom_level * 100).to_i}%"
 
@@ -261,8 +215,8 @@ class ImageViewer < Gtk::Application
 
   def update_status_label(path)
     filename = File.basename(path)
-    pinned = @metadata['pinned'].include?(filename)
-    skipped = @metadata['skipped'].include?(filename)
+    pinned = @metadata.pinned?(filename)
+    skipped = @metadata.skipped?(filename)
 
     @status_label.remove_css_class('pinned')
     @status_label.remove_css_class('skipped')
@@ -306,71 +260,36 @@ class ImageViewer < Gtk::Application
   end
 
   def navigate_next
-    next_idx = find_next_index(@current_index)
-    unless next_idx
-      # Wrap around to beginning
-      next_idx = find_next_index(-1)
-    end
-    if next_idx
-      @current_index = next_idx
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_next
       show_current_image
     end
   end
 
   def navigate_prev
-    prev_idx = find_prev_index(@current_index)
-    unless prev_idx
-      # Wrap around to end
-      prev_idx = find_prev_index(@images.size)
-    end
-    if prev_idx
-      @current_index = prev_idx
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_prev
       show_current_image
     end
   end
 
-  def find_next_index(from_index)
-    ((from_index + 1)...@images.size).each do |i|
-      return i unless skipped?(@images[i])
-    end
-    nil
-  end
-
-  def find_prev_index(from_index)
-    (from_index - 1).downto(0).each do |i|
-      return i unless skipped?(@images[i])
-    end
-    nil
-  end
-
-  def skipped?(path)
-    filename = File.basename(path)
-    @metadata['skipped'].include?(filename)
-  end
-
   def toggle_pinned
-    return if @images.empty?
+    return if @image_list.nil? || @image_list.empty?
 
-    filename = File.basename(@images[@current_index])
-    if @metadata['pinned'].include?(filename)
-      @metadata['pinned'].delete(filename)
-    else
-      @metadata['pinned'] << filename
-      @metadata['skipped'].delete(filename)
-    end
+    filename = File.basename(@image_list.current)
+    @metadata.toggle_pinned(filename)
 
     save_metadata
-    update_status_label(@images[@current_index])
+    update_status_label(@image_list.current)
   end
 
   def mark_skipped
-    return if @images.empty?
+    return if @image_list.nil? || @image_list.empty?
 
-    filename = File.basename(@images[@current_index])
-    unless @metadata['skipped'].include?(filename)
-      @metadata['skipped'] << filename
-    end
-    @metadata['pinned'].delete(filename)
+    filename = File.basename(@image_list.current)
+    @metadata.mark_skipped(filename)
 
     save_metadata
     navigate_next || show_current_image
@@ -395,21 +314,17 @@ class ImageViewer < Gtk::Application
   end
 
   def open_external
-    return if @images.empty?
+    return if @image_list.nil? || @image_list.empty?
 
-    path = @images[@current_index]
+    path = @image_list.current
     system('xdg-open', path)
   end
 
   def save_metadata
-    return unless @directory
+    return unless @directory && @metadata
 
-    meta_path = File.join(@directory, META_FILE)
-    begin
-      File.write(meta_path, @metadata.to_yaml)
-    rescue StandardError => e
-      warn "Failed to save metadata: #{e.message}"
-    end
+    meta_path = File.join(@directory, ImageViewerCore::META_FILE)
+    @metadata.save_to_file(meta_path)
   end
 
   def show_copy_dialog
@@ -432,23 +347,8 @@ class ImageViewer < Gtk::Application
   end
 
   def copy_pinned_files(dest_dir)
-    pinned_files = @metadata['pinned']
-    copied = 0
-
-    pinned_files.each do |filename|
-      src = File.join(@directory, filename)
-      next unless File.exist?(src)
-
-      dest = File.join(dest_dir, filename)
-      begin
-        FileUtils.cp(src, dest)
-        copied += 1
-      rescue StandardError => e
-        warn "Failed to copy #{filename}: #{e.message}"
-      end
-    end
-
-    show_message_dialog("Copied #{copied} of #{pinned_files.size} pinned files.")
+    result = ImageViewerCore::FileCopier.copy_pinned(@metadata, @directory, dest_dir)
+    show_message_dialog("Copied #{result[:copied]} of #{result[:total]} pinned files.")
   end
 
   def show_message_dialog(message)
