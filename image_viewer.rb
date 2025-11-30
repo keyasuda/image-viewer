@@ -14,7 +14,7 @@ class ImageViewer < Gtk::Application
   MAX_ZOOM = 10.0
 
   def initialize(path = nil)
-    super('com.example.imageviewer', :flags_none)
+    super('com.example.imageviewer', :non_unique)
     @zoom_level = 1.0
     @fit_to_window = true
     @initial_file = nil

@@ -49,7 +49,7 @@ GTK4のRubyバインディング (gtk4 gem) は以下の点に注意：
 
 2. **スタイルプロバイダ優先度**: `Gtk::STYLE_PROVIDER_PRIORITY_APPLICATION` ではなく `Gtk::StyleProvider::PRIORITY_APPLICATION` を使用
 
-3. **アプリケーションフラグ**: ディレクトリパスを引数で受け取る場合、`:handles_open` ではなく `:flags_none` を使用し、コンストラクタで直接パスを受け取る
+3. **アプリケーションフラグ**: ディレクトリパスを引数で受け取る場合、`:handles_open` ではなく `:non_unique` を使用し、コンストラクタで直接パスを受け取る。`:flags_none` だと同じアプリIDのインスタンスが単一プロセス扱いになり、片方のウィンドウを閉じると残りのウィンドウでキー操作が効かなくなる問題が発生する
 
 4. **Gtk::AppChooserDialog**: GTK4 Rubyバインディングでは正常に動作しない。代わりに `Gio::AppInfo.get_all_for_type` でアプリ一覧を取得し、`Gtk::Dialog` + `Gtk::ListBox` で自作ダイアログを実装する
 
