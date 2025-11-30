@@ -69,6 +69,29 @@ RSpec.describe ImageViewerCore::Metadata do
     end
   end
 
+  describe '#pinned_count and #skipped_count' do
+    it 'returns correct counts' do
+      metadata.toggle_pinned('pin1.jpg')
+      metadata.toggle_pinned('pin2.jpg')
+      metadata.mark_skipped('skip1.jpg')
+
+      expect(metadata.pinned_count).to eq(2)
+      expect(metadata.skipped_count).to eq(1)
+    end
+  end
+
+  describe '#clear_pinned' do
+    it 'clears all pinned files' do
+      metadata.toggle_pinned('pin1.jpg')
+      metadata.toggle_pinned('pin2.jpg')
+      expect(metadata.pinned_count).to eq(2)
+
+      metadata.clear_pinned
+      expect(metadata.pinned_count).to eq(0)
+      expect(metadata.pinned).to be_empty
+    end
+  end
+
   describe '.load_from_file and #save_to_file' do
     it 'saves and loads metadata correctly' do
       Dir.mktmpdir do |dir|
@@ -157,6 +180,44 @@ RSpec.describe ImageViewerCore::ImageList do
       expect(File.basename(list.current)).to eq('img3.jpg')
       list.navigate_next # img3 -> img1 (skips img4, img5, wraps)
       expect(File.basename(list.current)).to eq('img1.jpg')
+    end
+  end
+
+  describe 'navigation between pinned files' do
+    let(:metadata) { ImageViewerCore::Metadata.new }
+    let(:list) do
+      images = ['/path/img1.jpg', '/path/img2.jpg', '/path/img3.jpg', '/path/img4.jpg', '/path/img5.jpg']
+      described_class.new(images, metadata)
+    end
+
+    it 'navigates to next pinned image' do
+      metadata.toggle_pinned('img2.jpg')
+      metadata.toggle_pinned('img4.jpg')
+      list.navigate_next_pinned
+      expect(File.basename(list.current)).to eq('img2.jpg')
+      list.navigate_next_pinned
+      expect(File.basename(list.current)).to eq('img4.jpg')
+    end
+
+    it 'navigates to previous pinned image' do
+      metadata.toggle_pinned('img2.jpg')
+      metadata.toggle_pinned('img4.jpg')
+      list.navigate_next_pinned # img1 -> img2
+      list.navigate_next_pinned # img2 -> img4
+      list.navigate_prev_pinned # img4 -> img2
+      expect(File.basename(list.current)).to eq('img2.jpg')
+    end
+
+    it 'wraps around when navigating to next pinned' do
+      metadata.toggle_pinned('img2.jpg')
+      list.navigate_next_pinned # img1 -> img2
+      list.navigate_next_pinned # img2 -> img2 (wrap)
+      expect(File.basename(list.current)).to eq('img2.jpg')
+    end
+
+    it 'returns nil when no pinned files exist' do
+      result = list.navigate_next_pinned
+      expect(result).to be_nil
     end
   end
 

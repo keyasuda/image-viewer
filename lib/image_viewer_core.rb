@@ -69,6 +69,18 @@ module ImageViewerCore
     def unmark_skipped(filename)
       @skipped.delete(filename)
     end
+
+    def pinned_count
+      @pinned.size
+    end
+
+    def skipped_count
+      @skipped.size
+    end
+
+    def clear_pinned
+      @pinned.clear
+    end
   end
 
   # Image list management and sorting
@@ -159,6 +171,42 @@ module ImageViewerCore
     def find_prev_index(from_index)
       (from_index - 1).downto(0).each do |i|
         return i unless @metadata.skipped?(File.basename(@images[i]))
+      end
+      nil
+    end
+
+    def navigate_next_pinned
+      return nil if @images.empty?
+
+      next_idx = find_next_pinned_index(@current_index)
+      next_idx ||= find_next_pinned_index(-1) # Wrap around
+      if next_idx
+        @current_index = next_idx
+        current
+      end
+    end
+
+    def navigate_prev_pinned
+      return nil if @images.empty?
+
+      prev_idx = find_prev_pinned_index(@current_index)
+      prev_idx ||= find_prev_pinned_index(@images.size) # Wrap around
+      if prev_idx
+        @current_index = prev_idx
+        current
+      end
+    end
+
+    def find_next_pinned_index(from_index)
+      ((from_index + 1)...@images.size).each do |i|
+        return i if @metadata.pinned?(File.basename(@images[i]))
+      end
+      nil
+    end
+
+    def find_prev_pinned_index(from_index)
+      (from_index - 1).downto(0).each do |i|
+        return i if @metadata.pinned?(File.basename(@images[i]))
       end
       nil
     end

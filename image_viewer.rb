@@ -33,6 +33,7 @@ class ImageViewer < Gtk::Application
     @image_list = nil
     @preloaded_pixbuf = nil
     @preload_index = nil
+    @current_pixbuf = nil
 
     signal_connect('activate') { on_activate }
   end
@@ -176,6 +177,8 @@ class ImageViewer < Gtk::Application
         pixbuf = GdkPixbuf::Pixbuf.new(file: path)
       end
 
+      @current_pixbuf = pixbuf
+
       if @fit_to_window
         @image.set_pixbuf(pixbuf)
         @image.can_shrink = true
@@ -220,8 +223,9 @@ class ImageViewer < Gtk::Application
     position = "#{@image_list.current_index + 1}/#{@image_list.size}"
     dimensions = "#{pixbuf.width}x#{pixbuf.height}"
     zoom_info = @fit_to_window ? 'Fit' : "#{(@zoom_level * 100).to_i}%"
+    pin_skip_info = "📌#{@metadata.pinned_count} ⏭️#{@metadata.skipped_count}"
 
-    @info_bar.text = "#{filename} | #{position} | #{dimensions} | Zoom: #{zoom_info}"
+    @info_bar.text = "#{filename} | #{position} | #{dimensions} | Zoom: #{zoom_info} | #{pin_skip_info}"
   end
 
   def update_status_label(path)
@@ -248,11 +252,23 @@ class ImageViewer < Gtk::Application
 
     case keyval
     when 0xff53 # Right
-      navigate_next
+      if ctrl
+        navigate_next_pinned
+      else
+        navigate_next
+      end
     when 0xff51 # Left
-      navigate_prev
+      if ctrl
+        navigate_prev_pinned
+      else
+        navigate_prev
+      end
     when 0x020 # space
-      toggle_pinned
+      if ctrl
+        show_clear_pinned_dialog
+      else
+        toggle_pinned
+      end
     when 0x078, 0x058 # x, X
       mark_skipped
     when 0x02b, 0x03d # plus, equal
@@ -288,6 +304,22 @@ class ImageViewer < Gtk::Application
     end
   end
 
+  def navigate_next_pinned
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_next_pinned
+      show_current_image
+    end
+  end
+
+  def navigate_prev_pinned
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_prev_pinned
+      show_current_image
+    end
+  end
+
   def toggle_pinned
     return if @image_list.nil? || @image_list.empty?
 
@@ -296,6 +328,7 @@ class ImageViewer < Gtk::Application
 
     save_metadata
     update_status_label(@image_list.current)
+    update_info_bar(@image_list.current, @current_pixbuf) if @current_pixbuf
   end
 
   def mark_skipped
@@ -306,6 +339,31 @@ class ImageViewer < Gtk::Application
 
     save_metadata
     navigate_next || show_current_image
+  end
+
+  def show_clear_pinned_dialog
+    return if @metadata.nil?
+    return if @metadata.pinned_count == 0
+
+    dialog = Gtk::MessageDialog.new(
+      parent: @window,
+      flags: Gtk::DialogFlags::MODAL | Gtk::DialogFlags::DESTROY_WITH_PARENT,
+      type: :question,
+      buttons: :yes_no,
+      message: "Clear all #{@metadata.pinned_count} pinned images?"
+    )
+
+    dialog.signal_connect('response') do |d, response|
+      if response == Gtk::ResponseType::YES
+        @metadata.clear_pinned
+        save_metadata
+        update_status_label(@image_list.current) if @image_list&.current
+        update_info_bar(@image_list.current, @current_pixbuf) if @image_list&.current && @current_pixbuf
+      end
+      d.destroy
+    end
+
+    dialog.present
   end
 
   def zoom_in
