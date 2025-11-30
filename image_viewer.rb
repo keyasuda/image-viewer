@@ -330,7 +330,78 @@ class ImageViewer < Gtk::Application
     return if @image_list.nil? || @image_list.empty?
 
     path = @image_list.current
-    system('xdg-open', path)
+    file = Gio::File.new_for_path(path)
+    content_type = Gio::ContentType.guess(path, nil).first
+
+    # Get list of apps that can open this content type
+    apps = Gio::AppInfo.get_all_for_type(content_type)
+    return if apps.empty?
+
+    # Create a simple dialog with app list
+    dialog = Gtk::Dialog.new(
+      title: 'Open With',
+      parent: @window,
+      flags: Gtk::DialogFlags::MODAL | Gtk::DialogFlags::DESTROY_WITH_PARENT
+    )
+    dialog.add_button('Cancel', Gtk::ResponseType::CANCEL)
+    dialog.add_button('Open', Gtk::ResponseType::OK)
+    dialog.set_default_size(300, 400)
+
+    # Create scrolled list of applications
+    scrolled = Gtk::ScrolledWindow.new
+    scrolled.vexpand = true
+    scrolled.hexpand = true
+
+    listbox = Gtk::ListBox.new
+    listbox.selection_mode = :single
+
+    rows = []
+    apps.each do |app|
+      row = Gtk::ListBoxRow.new
+      box = Gtk::Box.new(:horizontal, 10)
+      box.margin_start = 10
+      box.margin_end = 10
+      box.margin_top = 5
+      box.margin_bottom = 5
+
+      label = Gtk::Label.new(app.name)
+      label.xalign = 0
+      box.append(label)
+
+      row.child = box
+      listbox.append(row)
+      rows << row
+    end
+
+    # Select first item by default
+    listbox.select_row(rows.first) if rows.any?
+
+    # Double-click to open
+    listbox.signal_connect('row-activated') do |_listbox, row|
+      idx = rows.index(row)
+      if idx
+        app_info = apps[idx]
+        app_info.launch([file], nil) if app_info
+        dialog.destroy
+      end
+    end
+
+    scrolled.child = listbox
+    dialog.content_area.append(scrolled)
+
+    dialog.signal_connect('response') do |d, response|
+      if response == Gtk::ResponseType::OK
+        selected_row = listbox.selected_row
+        if selected_row
+          idx = rows.index(selected_row)
+          app_info = apps[idx] if idx
+          app_info.launch([file], nil) if app_info
+        end
+      end
+      d.destroy
+    end
+
+    dialog.present
   end
 
   def save_metadata
