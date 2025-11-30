@@ -85,6 +85,9 @@ class ImageViewer < Gtk::Application
     @image.keep_aspect_ratio = true
     @scrolled_window.child = @image
 
+    # Drag source for image
+    setup_drag_source
+
     # Info bar at bottom
     @info_bar = Gtk::Label.new('')
     @info_bar.xalign = 0
@@ -105,6 +108,34 @@ class ImageViewer < Gtk::Application
     apply_css
 
     @window.present
+  end
+
+  def setup_drag_source
+    drag_source = Gtk::DragSource.new
+    drag_source.actions = Gdk::DragAction::COPY
+
+    drag_source.signal_connect('prepare') do |_source, _x, _y|
+      next nil if @image_list.nil? || @image_list.empty?
+
+      # Set drag icon
+      if @current_pixbuf
+        icon_size = 64
+        scale = [icon_size.to_f / @current_pixbuf.width, icon_size.to_f / @current_pixbuf.height].min
+        icon_width = (@current_pixbuf.width * scale).to_i
+        icon_height = (@current_pixbuf.height * scale).to_i
+        icon = @current_pixbuf.scale_simple(icon_width, icon_height, :bilinear)
+        texture = Gdk::Texture.new(icon)
+        drag_source.set_icon(texture, icon_width / 2, icon_height / 2)
+      end
+
+      path = @image_list.current
+      file = Gio::File.new_for_path(path)
+      uri = file.uri + "\r\n"
+      bytes = GLib::Bytes.new(uri)
+      Gdk::ContentProvider.new('text/uri-list', bytes)
+    end
+
+    @image.add_controller(drag_source)
   end
 
   def apply_css
