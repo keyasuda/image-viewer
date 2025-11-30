@@ -19,6 +19,8 @@ Ruby + GTK4で実装された画像選別ビューワアプリケーションで
 ```
 image-viewer/
 ├── image_viewer.rb           # メインアプリケーション (GUI)
+├── image_viewer.sh           # 起動用シェルスクリプト (rbenv対応)
+├── image-viewer.desktop      # デスクトップエントリ
 ├── lib/
 │   └── image_viewer_core.rb  # コアロジック (テスト可能)
 ├── spec/
@@ -48,6 +50,10 @@ GTK4のRubyバインディング (gtk4 gem) は以下の点に注意：
 2. **スタイルプロバイダ優先度**: `Gtk::STYLE_PROVIDER_PRIORITY_APPLICATION` ではなく `Gtk::StyleProvider::PRIORITY_APPLICATION` を使用
 
 3. **アプリケーションフラグ**: ディレクトリパスを引数で受け取る場合、`:handles_open` ではなく `:flags_none` を使用し、コンストラクタで直接パスを受け取る
+
+4. **Gtk::AppChooserDialog**: GTK4 Rubyバインディングでは正常に動作しない。代わりに `Gio::AppInfo.get_all_for_type` でアプリ一覧を取得し、`Gtk::Dialog` + `Gtk::ListBox` で自作ダイアログを実装する
+
+5. **ListBoxRow のデータ保持**: `set_data`/`get_data` は使用不可。Ruby配列でrowを管理し、`rows.index(selected_row)` でインデックスを取得する
 
 ### ビルド・実行
 
@@ -100,17 +106,24 @@ bundle exec rspec
 テスト対象：
 - メタデータの保存・読み込み
 - ピン留め/スキップのトグル動作
+- ピン留め数/スキップ数のカウント
+- ピン留めクリア
 - 自然順ソート (Natural Sort)
 - スキップファイルを考慮したナビゲーション
+- ピン留めファイル間のナビゲーション
 - ラップアラウンド動作
 - ファイルコピー処理
 
 GUIに直接関連する機能（キー押下、画像表示等）は手動テストで確認：
 
 1. ディレクトリ引数あり/なしでの起動
-2. 左右キーでのナビゲーション
-3. Space/Xキーでのピン留め/スキップ
-4. ズーム操作 (+/-/0)
-5. 外部アプリ起動 (E)
-6. ピン留め画像のコピー機能
+2. ファイル引数での起動（指定ファイルから表示開始）
+3. 左右キーでのナビゲーション
+4. Ctrl+左右キーでのピン留め間ナビゲーション
+5. Space/Xキーでのピン留め/スキップ
+6. Ctrl+Spaceでのピン留めクリア
+7. ズーム操作 (+/-/0)
+8. 外部アプリ起動 (E) - アプリ選択ダイアログ
+9. ピン留め画像のコピー機能
+10. ESCで終了
 
