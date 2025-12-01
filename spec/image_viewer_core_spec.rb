@@ -113,6 +113,72 @@ RSpec.describe ImageViewerCore::Metadata do
       expect(loaded.pinned).to eq([])
       expect(loaded.skipped).to eq([])
     end
+
+    it 'tracks source hash on load' do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'imgview_meta.yml')
+        File.write(path, { 'pinned' => [], 'skipped' => [] }.to_yaml)
+
+        loaded = described_class.load_from_file(path)
+        expect(loaded.source_hash).not_to be_nil
+      end
+    end
+
+    it 'raises ConcurrentModificationError when file is modified externally' do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'imgview_meta.yml')
+        
+        # Initial save
+        metadata.save_to_file(path)
+        
+        # Load in another instance
+        other_metadata = described_class.load_from_file(path)
+        
+        # Modify externally (simulate another process saving)
+        other_metadata.toggle_pinned('external.jpg')
+        other_metadata.save_to_file(path)
+        
+        # Try to save original instance
+        metadata.toggle_pinned('local.jpg')
+        expect {
+          metadata.save_to_file(path)
+        }.to raise_error(ImageViewerCore::ConcurrentModificationError)
+      end
+    end
+
+    it 'overwrites when force is true' do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'imgview_meta.yml')
+        
+        metadata.save_to_file(path)
+        
+        # Modify externally
+        File.write(path, "modified: true\n")
+        
+        # Save with force: true
+        expect {
+          metadata.save_to_file(path, force: true)
+        }.not_to raise_error
+        
+        content = File.read(path)
+        expect(content).to include('pinned')
+      end
+    end
+
+    it 'updates source_hash after successful save' do
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'imgview_meta.yml')
+        
+        metadata.save_to_file(path)
+        initial_hash = metadata.source_hash
+        
+        metadata.toggle_pinned('new.jpg')
+        metadata.save_to_file(path)
+        
+        expect(metadata.source_hash).not_to eq(initial_hash)
+        expect(metadata.source_hash).to eq(Digest::SHA256.hexdigest(File.read(path)))
+      end
+    end
   end
 end
 

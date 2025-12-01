@@ -514,11 +514,28 @@ class ImageViewer < Gtk::Application
     dialog.present
   end
 
-  def save_metadata
+  def save_metadata(force: false)
     return unless @directory && @metadata
 
     meta_path = File.join(@directory, ImageViewerCore::META_FILE)
-    @metadata.save_to_file(meta_path)
+    @metadata.save_to_file(meta_path, force: force)
+  rescue ImageViewerCore::ConcurrentModificationError
+    dialog = Gtk::MessageDialog.new(
+      parent: @window,
+      flags: Gtk::DialogFlags::MODAL | Gtk::DialogFlags::DESTROY_WITH_PARENT,
+      type: :question,
+      buttons: :yes_no,
+      message: "Metadata file has been modified by another process.\nOverwrite?"
+    )
+
+    dialog.signal_connect('response') do |d, response|
+      if response == Gtk::ResponseType::YES
+        save_metadata(force: true)
+      end
+      d.destroy
+    end
+
+    dialog.present
   end
 
   def show_copy_dialog

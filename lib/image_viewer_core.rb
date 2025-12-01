@@ -2,19 +2,24 @@
 
 require 'yaml'
 require 'fileutils'
+require 'digest'
 
 # Core logic for image viewer, separated from GUI
 module ImageViewerCore
   SUPPORTED_EXTENSIONS = %w[.jpg .jpeg .png .webp .tiff .tif .bmp].freeze
   META_FILE = 'imgview_meta.yml'
 
+  class ConcurrentModificationError < StandardError; end
+
   # Metadata management
   class Metadata
     attr_reader :pinned, :skipped
+    attr_accessor :source_hash
 
     def initialize
       @pinned = []
       @skipped = []
+      @source_hash = nil
     end
 
     def self.load_from_file(path)
@@ -22,7 +27,9 @@ module ImageViewerCore
       return metadata unless File.exist?(path)
 
       begin
-        data = YAML.safe_load_file(path, permitted_classes: [Symbol]) || {}
+        content = File.read(path)
+        metadata.source_hash = Digest::SHA256.hexdigest(content)
+        data = YAML.safe_load(content, permitted_classes: [Symbol]) || {}
         metadata.instance_variable_set(:@pinned, Array(data['pinned']))
         metadata.instance_variable_set(:@skipped, Array(data['skipped']))
       rescue StandardError => e
@@ -31,12 +38,26 @@ module ImageViewerCore
       metadata
     end
 
-    def save_to_file(path)
+    def save_to_file(path, force: false)
+      if !force && File.exist?(path)
+        current_content = File.read(path)
+        current_hash = Digest::SHA256.hexdigest(current_content)
+        
+        if @source_hash && current_hash != @source_hash
+          raise ConcurrentModificationError, "Metadata file has been modified by another process"
+        end
+      end
+
       data = {
         'pinned' => @pinned,
         'skipped' => @skipped
       }
-      File.write(path, data.to_yaml)
+      yaml_content = data.to_yaml
+      File.write(path, yaml_content)
+      @source_hash = Digest::SHA256.hexdigest(yaml_content)
+      true
+    rescue ConcurrentModificationError
+      raise
     rescue StandardError => e
       warn "Failed to save metadata: #{e.message}"
       false
