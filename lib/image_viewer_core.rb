@@ -235,6 +235,15 @@ module ImageViewerCore
 
   # Copy pinned files to destination
   class FileCopier
+    def self.check_existing(metadata, dest_dir)
+      existing = []
+      metadata.pinned.each do |filename|
+        dest = File.join(dest_dir, filename)
+        existing << filename if File.exist?(dest)
+      end
+      existing
+    end
+
     def self.copy_pinned(metadata, source_dir, dest_dir)
       copied = 0
       errors = []

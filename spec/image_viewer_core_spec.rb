@@ -319,4 +319,33 @@ RSpec.describe ImageViewerCore::FileCopier do
       end
     end
   end
+
+  describe '.check_existing' do
+    it 'returns list of existing files' do
+      Dir.mktmpdir do |dest_dir|
+        # Create some existing files
+        FileUtils.touch(File.join(dest_dir, 'existing1.jpg'))
+        FileUtils.touch(File.join(dest_dir, 'existing2.jpg'))
+
+        metadata = ImageViewerCore::Metadata.new
+        metadata.toggle_pinned('existing1.jpg')
+        metadata.toggle_pinned('existing2.jpg')
+        metadata.toggle_pinned('new.jpg')
+
+        existing = described_class.check_existing(metadata, dest_dir)
+        expect(existing).to contain_exactly('existing1.jpg', 'existing2.jpg')
+      end
+    end
+
+    it 'returns empty list when no files exist' do
+      Dir.mktmpdir do |dest_dir|
+        metadata = ImageViewerCore::Metadata.new
+        metadata.toggle_pinned('new1.jpg')
+        metadata.toggle_pinned('new2.jpg')
+
+        existing = described_class.check_existing(metadata, dest_dir)
+        expect(existing).to be_empty
+      end
+    end
+  end
 end

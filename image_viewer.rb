@@ -511,7 +511,38 @@ class ImageViewer < Gtk::Application
 
     dialog.signal_connect('response') do |d, response|
       if response == Gtk::ResponseType::ACCEPT
-        copy_pinned_files(d.file.path)
+        dest_dir = d.file.path
+        existing = ImageViewerCore::FileCopier.check_existing(@metadata, dest_dir)
+
+        if existing.empty?
+          copy_pinned_files(dest_dir)
+        else
+          show_overwrite_confirmation(dest_dir, existing)
+        end
+      end
+      d.destroy
+    end
+
+    dialog.present
+  end
+
+  def show_overwrite_confirmation(dest_dir, existing)
+    message = "The following files already exist in the destination folder and will be overwritten:\n\n"
+    message += existing.take(5).join("\n")
+    message += "\n...and #{existing.size - 5} more" if existing.size > 5
+    message += "\n\nDo you want to continue?"
+
+    dialog = Gtk::MessageDialog.new(
+      parent: @window,
+      flags: Gtk::DialogFlags::MODAL | Gtk::DialogFlags::DESTROY_WITH_PARENT,
+      type: :warning,
+      buttons: :yes_no,
+      message: message
+    )
+
+    dialog.signal_connect('response') do |d, response|
+      if response == Gtk::ResponseType::YES
+        copy_pinned_files(dest_dir)
       end
       d.destroy
     end
