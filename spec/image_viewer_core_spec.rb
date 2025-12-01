@@ -181,6 +181,23 @@ RSpec.describe ImageViewerCore::ImageList do
       list.navigate_next # img3 -> img1 (skips img4, img5, wraps)
       expect(File.basename(list.current)).to eq('img1.jpg')
     end
+
+    it 'navigates forward multiple steps' do
+      list.navigate_forward(2)
+      expect(File.basename(list.current)).to eq('img3.jpg')
+    end
+
+    it 'navigates backward multiple steps' do
+      list.navigate_next # img1 -> img2
+      list.navigate_next # img2 -> img3
+      list.navigate_backward(2)
+      expect(File.basename(list.current)).to eq('img1.jpg')
+    end
+
+    it 'navigates forward with wrap around' do
+      list.navigate_forward(6) # 5 images total, so 1 wrap + 1
+      expect(File.basename(list.current)).to eq('img2.jpg')
+    end
   end
 
   describe 'navigation between pinned files' do

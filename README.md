@@ -68,6 +68,7 @@ xdg-mime default image-viewer.desktop image/png
 | 画面フィット | `0` |
 | 外部アプリで開く | `E` |
 | 終了 | `Esc` |
+| 10枚スキップ | `Shift+←` / `Shift+→` |
 
 ## 機能詳細
 

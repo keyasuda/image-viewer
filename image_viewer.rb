@@ -280,17 +280,22 @@ class ImageViewer < Gtk::Application
 
   def handle_key_press(keyval, state)
     ctrl = (state & Gdk::ModifierType::CONTROL_MASK) != 0
+    shift = (state & Gdk::ModifierType::SHIFT_MASK) != 0
 
     case keyval
     when 0xff53 # Right
       if ctrl
         navigate_next_pinned
+      elsif shift
+        navigate_forward(10)
       else
         navigate_next
       end
     when 0xff51 # Left
       if ctrl
         navigate_prev_pinned
+      elsif shift
+        navigate_backward(10)
       else
         navigate_prev
       end
@@ -331,6 +336,22 @@ class ImageViewer < Gtk::Application
     return if @image_list.nil? || @image_list.empty?
 
     if @image_list.navigate_prev
+      show_current_image
+    end
+  end
+
+  def navigate_forward(steps)
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_forward(steps)
+      show_current_image
+    end
+  end
+
+  def navigate_backward(steps)
+    return if @image_list.nil? || @image_list.empty?
+
+    if @image_list.navigate_backward(steps)
       show_current_image
     end
   end

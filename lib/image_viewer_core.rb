@@ -161,6 +161,28 @@ module ImageViewerCore
       end
     end
 
+    def navigate_forward(steps)
+      return nil if @images.empty?
+
+      steps.times do
+        next_idx = find_next_index(@current_index)
+        next_idx ||= find_next_index(-1) # Wrap around
+        @current_index = next_idx if next_idx
+      end
+      current
+    end
+
+    def navigate_backward(steps)
+      return nil if @images.empty?
+
+      steps.times do
+        prev_idx = find_prev_index(@current_index)
+        prev_idx ||= find_prev_index(@images.size) # Wrap around
+        @current_index = prev_idx if prev_idx
+      end
+      current
+    end
+
     def find_next_index(from_index)
       ((from_index + 1)...@images.size).each do |i|
         return i unless @metadata.skipped?(File.basename(@images[i]))
