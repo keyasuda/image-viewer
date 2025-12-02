@@ -191,8 +191,38 @@ class ImageViewer < Gtk::Application
     meta_path = File.join(@directory, ImageViewerCore::META_FILE)
     @metadata = ImageViewerCore::Metadata.load_from_file(meta_path)
 
-    # Load and sort image list, jump to initial file if specified
-    @image_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata, initial_file: @initial_file)
+    if @initial_file
+      # Lazy load: Show initial file immediately
+      @image_list = ImageViewerCore::ImageList.new([@initial_file], @metadata)
+      
+      # Load full list in background
+      Thread.new do
+        full_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata, initial_file: @initial_file)
+        GLib::Idle.add do
+          update_image_list(full_list)
+          false # Stop idle handler
+        end
+      end
+    else
+      # Directory mode: Load everything immediately
+      @image_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata)
+    end
+  end
+
+  def update_image_list(new_list)
+    return if new_list.nil? || new_list.empty?
+
+    # Preserve current file selection if possible
+    current_file = @image_list.current
+    @image_list = new_list
+    
+    # Try to keep pointing to the same file, or fallback to what the new list has
+    if current_file
+      @image_list.jump_to_file(current_file)
+    end
+
+    # Update UI
+    show_current_image
   end
 
   def show_current_image
