@@ -1,0 +1,44 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libgtk-4-dev \
+          libgdk-pixbuf-2.0-dev \
+          libcairo2-dev \
+          libpango1.0-dev \
+          libglib2.0-dev \
+          libatk1.0-dev \
+          libgdk-pixbuf2.0-dev \
+          libgirepository1.0-dev \
+          librsvg2-dev \
+          gobject-introspection \
+          libexif-dev
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: '3.4.5' # Match the version in .ruby-version
+        bundler-cache: true # runs 'bundle install' and caches the result
+
+    - name: Install dependencies
+      run: bundle install
+
+    - name: Run tests
+      run: |
+        # Run tests without requiring a display since they're unit tests
+        bundle exec rspec
