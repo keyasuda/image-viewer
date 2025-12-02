@@ -345,6 +345,8 @@ class ImageViewer < Gtk::Application
       reset_zoom
     when 0x065, 0x045 # e, E
       open_external
+    when 0xffff # Delete
+      show_trash_confirmation
     when 0xff1b # Escape
       @window.close
     else
@@ -421,6 +423,60 @@ class ImageViewer < Gtk::Application
 
     save_metadata
     navigate_next || show_current_image
+  end
+
+  def show_trash_confirmation
+    return if @image_list.nil? || @image_list.empty?
+
+    current_file = @image_list.current
+    filename = File.basename(current_file)
+
+    dialog = Gtk::MessageDialog.new(
+      parent: @window,
+      flags: Gtk::DialogFlags::MODAL | Gtk::DialogFlags::DESTROY_WITH_PARENT,
+      type: :question,
+      buttons: :yes_no,
+      message: "Move '#{filename}' to trash?"
+    )
+
+    dialog.signal_connect('response') do |d, response|
+      if response == Gtk::ResponseType::YES
+        move_to_trash(current_file)
+      end
+      d.destroy
+    end
+
+    dialog.present
+  end
+
+  def move_to_trash(path)
+    return unless File.exist?(path)
+
+    filename = File.basename(path)
+
+    # Move file to trash using gio trash
+    success = system('gio', 'trash', path)
+
+    if success
+      # Remove from metadata
+      @metadata.remove_file(filename) if @metadata
+
+      # Remove from image list and navigate to next
+      @image_list.remove_current
+
+      # Save metadata
+      save_metadata if @metadata
+
+      # Show next image or close if no images left
+      if @image_list.empty?
+        show_message_dialog("No more images in the directory.")
+        @window.close
+      else
+        show_current_image
+      end
+    else
+      show_message_dialog("Failed to move file to trash: #{filename}")
+    end
   end
 
   def show_clear_pinned_dialog

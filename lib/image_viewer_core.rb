@@ -102,6 +102,11 @@ module ImageViewerCore
     def clear_pinned
       @pinned.clear
     end
+
+    def remove_file(filename)
+      @pinned.delete(filename)
+      @skipped.delete(filename)
+    end
   end
 
   # Image list management and sorting
@@ -272,6 +277,17 @@ module ImageViewerCore
     def natural_sort_key(filename)
       filename.downcase.split(/(\d+)/).map do |part|
         part.match?(/\d+/) ? part.to_i : part
+      end
+    end
+
+    def remove_current
+      return if @images.empty?
+
+      @images.delete_at(@current_index)
+      
+      # Adjust current_index if we deleted the last item
+      if @current_index >= @images.size && !@images.empty?
+        @current_index = @images.size - 1
       end
     end
   end
