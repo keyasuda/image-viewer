@@ -85,8 +85,9 @@ class ImageViewer < Gtk::Application
     @image.keep_aspect_ratio = true
     @scrolled_window.child = @image
 
-    # Drag source for image
+    # Drag source and context menu for image
     setup_drag_source
+    setup_context_menu
 
     # Info bar at bottom
     @info_bar = Gtk::Label.new('')
@@ -136,6 +137,90 @@ class ImageViewer < Gtk::Application
     end
 
     @image.add_controller(drag_source)
+  end
+
+  def setup_context_menu
+    # Create a click controller to detect right-clicks
+    click_ctrl = Gtk::GestureClick.new
+    click_ctrl.button = 3  # Right mouse button
+
+    click_ctrl.signal_connect('pressed') do |controller, _n_press, x, y|
+      menu = create_context_menu
+      menu.pointing_to = Gdk::Rectangle.new(x.to_i, y.to_i, 1, 1)
+      menu.parent = @image
+      menu.popup
+    end
+
+    @image.add_controller(click_ctrl)
+  end
+
+  def create_context_menu
+    menu = Gtk::PopoverMenu.new
+
+    # Create section for navigation actions
+    nav_section = Gio::Menu.new
+    nav_section.append('Next Image', 'app.next')
+    nav_section.append('Previous Image', 'app.prev')
+    nav_section.append('Next Pinned', 'app.next_pinned')
+    nav_section.append('Previous Pinned', 'app.prev_pinned')
+
+    # Create section for pin/skip actions
+    pin_section = Gio::Menu.new
+    pin_section.append('Toggle Pinned', 'app.toggle_pinned')
+    pin_section.append('Mark as Skipped', 'app.mark_skipped')
+    pin_section.append('Clear All Pinned', 'app.clear_pinned')
+
+    # Create section for zoom actions
+    zoom_section = Gio::Menu.new
+    zoom_section.append('Zoom In', 'app.zoom_in')
+    zoom_section.append('Zoom Out', 'app.zoom_out')
+    zoom_section.append('Reset Zoom', 'app.reset_zoom')
+
+    # Create section for other actions
+    other_section = Gio::Menu.new
+    other_section.append('Open With...', 'app.open_external')
+    other_section.append('Move to Trash', 'app.move_to_trash')
+
+    # Add all sections to the menu model
+    menu_model = Gio::Menu.new
+    menu_model.append_section(nil, nav_section)
+    menu_model.append_section(nil, pin_section)
+    menu_model.append_section(nil, zoom_section)
+    menu_model.append_section(nil, other_section)
+
+    menu.menu_model = menu_model
+
+    # Connect actions to their respective handlers
+    action_group = Gio::SimpleActionGroup.new
+    @window.insert_action_group('app', action_group)
+
+    # Navigation actions
+    add_action(action_group, 'next') { navigate_next }
+    add_action(action_group, 'prev') { navigate_prev }
+    add_action(action_group, 'next_pinned') { navigate_next_pinned }
+    add_action(action_group, 'prev_pinned') { navigate_prev_pinned }
+
+    # Pin/skip actions
+    add_action(action_group, 'toggle_pinned') { toggle_pinned }
+    add_action(action_group, 'mark_skipped') { mark_skipped }
+    add_action(action_group, 'clear_pinned') { show_clear_pinned_dialog }
+
+    # Zoom actions
+    add_action(action_group, 'zoom_in') { zoom_in }
+    add_action(action_group, 'zoom_out') { zoom_out }
+    add_action(action_group, 'reset_zoom') { reset_zoom }
+
+    # Other actions
+    add_action(action_group, 'open_external') { open_external }
+    add_action(action_group, 'move_to_trash') { show_trash_confirmation }
+
+    menu
+  end
+
+  def add_action(action_group, name, &block)
+    action = Gio::SimpleAction.new(name, nil)
+    action.signal_connect('activate') { |a, p| block.call }
+    action_group.add_action(action)
   end
 
   def apply_css
