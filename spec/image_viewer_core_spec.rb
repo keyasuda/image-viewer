@@ -128,7 +128,8 @@ RSpec.describe ImageViewerCore::Metadata do
       Dir.mktmpdir do |dir|
         path = File.join(dir, 'imgview_meta.yml')
         
-        # Initial save
+        # Initial save - ensure content exists so file is created
+        metadata.toggle_pinned('init.jpg')
         metadata.save_to_file(path)
         
         # Load in another instance
@@ -150,6 +151,8 @@ RSpec.describe ImageViewerCore::Metadata do
       Dir.mktmpdir do |dir|
         path = File.join(dir, 'imgview_meta.yml')
         
+        # Ensure we have content to save
+        metadata.toggle_pinned('something.jpg')
         metadata.save_to_file(path)
         
         # Modify externally
@@ -177,6 +180,41 @@ RSpec.describe ImageViewerCore::Metadata do
         
         expect(metadata.source_hash).not_to eq(initial_hash)
         expect(metadata.source_hash).to eq(Digest::SHA256.hexdigest(File.read(path)))
+      end
+    end
+
+    describe 'when metadata is empty' do
+      it 'does not create file if it does not exist' do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, 'imgview_meta.yml')
+          result = metadata.save_to_file(path)
+          
+          expect(result).to be true
+          expect(File.exist?(path)).to be false
+        end
+      end
+
+      it 'deletes file only when all metadata is empty' do
+        Dir.mktmpdir do |dir|
+          path = File.join(dir, 'imgview_meta.yml')
+          
+          # Create file with both pinned and skipped content
+          metadata.toggle_pinned('pinned.jpg')
+          metadata.mark_skipped('skipped.jpg')
+          metadata.save_to_file(path)
+          expect(File.exist?(path)).to be true
+          
+          # Clear only pinned, file should still exist as skipped is not empty
+          metadata.clear_pinned
+          metadata.save_to_file(path)
+          expect(File.exist?(path)).to be true
+          
+          # Clear skipped, now file should be deleted
+          metadata.unmark_skipped('skipped.jpg')
+          result = metadata.save_to_file(path)
+          expect(result).to be true
+          expect(File.exist?(path)).to be false
+        end
       end
     end
   end

@@ -48,6 +48,12 @@ module ImageViewerCore
         end
       end
 
+      if @pinned.empty? && @skipped.empty?
+        FileUtils.rm_f(path)
+        @source_hash = nil
+        return true
+      end
+
       data = {
         'pinned' => @pinned,
         'skipped' => @skipped
