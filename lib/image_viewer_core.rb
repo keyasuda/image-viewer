@@ -48,6 +48,12 @@ module ImageViewerCore
         end
       end
 
+      if @pinned.empty? && @skipped.empty?
+        File.delete(path) if File.exist?(path)
+        @source_hash = nil
+        return true
+      end
+
       data = {
         'pinned' => @pinned,
         'skipped' => @skipped
