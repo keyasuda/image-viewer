@@ -194,19 +194,23 @@ RSpec.describe ImageViewerCore::Metadata do
         end
       end
 
-      it 'deletes file if it exists' do
+      it 'deletes file only when all metadata is empty' do
         Dir.mktmpdir do |dir|
           path = File.join(dir, 'imgview_meta.yml')
           
-          # Create file with some content
-          metadata.toggle_pinned('file.jpg')
+          # Create file with both pinned and skipped content
+          metadata.toggle_pinned('pinned.jpg')
+          metadata.mark_skipped('skipped.jpg')
           metadata.save_to_file(path)
           expect(File.exist?(path)).to be true
           
-          # clear metadata
+          # Clear only pinned, file should still exist as skipped is not empty
           metadata.clear_pinned
-          # Assuming skipped is empty by default
+          metadata.save_to_file(path)
+          expect(File.exist?(path)).to be true
           
+          # Clear skipped, now file should be deleted
+          metadata.unmark_skipped('skipped.jpg')
           result = metadata.save_to_file(path)
           expect(result).to be true
           expect(File.exist?(path)).to be false
