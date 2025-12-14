@@ -49,7 +49,7 @@ module ImageViewerCore
       end
 
       if @pinned.empty? && @skipped.empty?
-        File.delete(path) if File.exist?(path)
+        FileUtils.rm_f(path)
         @source_hash = nil
         return true
       end
