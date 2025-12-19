@@ -321,6 +321,7 @@ class ImageViewer < Gtk::Application
         pixbuf = @preloaded_pixbuf
       else
         pixbuf = GdkPixbuf::Pixbuf.new(file: path)
+        pixbuf = apply_exif_rotation(pixbuf, path)
       end
 
       @current_pixbuf = pixbuf
@@ -355,7 +356,8 @@ class ImageViewer < Gtk::Application
     Thread.new do
       begin
         path = @image_list.images[next_idx]
-        @preloaded_pixbuf = GdkPixbuf::Pixbuf.new(file: path)
+        pixbuf = GdkPixbuf::Pixbuf.new(file: path)
+        @preloaded_pixbuf = apply_exif_rotation(pixbuf, path)
         @preload_index = next_idx
       rescue StandardError
         @preloaded_pixbuf = nil
@@ -372,6 +374,39 @@ class ImageViewer < Gtk::Application
     pin_skip_info = "📌#{@metadata.pinned_count} ⏭️#{@metadata.skipped_count}"
 
     @info_bar.text = "#{filename} | #{position} | #{dimensions} | Zoom: #{zoom_info} | #{pin_skip_info}"
+  end
+
+  def apply_exif_rotation(pixbuf, path)
+    return pixbuf unless ['.jpg', '.jpeg', '.tiff', '.tif'].include?(File.extname(path).downcase)
+
+    begin
+      # Fix: Open with File.open to handle non-ASCII paths correctly, and use block to auto-close
+      orientation = File.open(path) do |f|
+        data = Exif::Data.new(f)
+        data.orientation
+      end
+      
+      case orientation
+      when 2 # Mirror horizontal
+        pixbuf = pixbuf.flip(true)
+      when 3 # Rotate 180
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::UPSIDEDOWN)
+      when 4 # Mirror vertical
+        pixbuf = pixbuf.flip(false)
+      when 5 # Mirror horizontal and rotate 270 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::CLOCKWISE).flip(true)
+      when 6 # Rotate 90 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::CLOCKWISE)
+      when 7 # Mirror horizontal and rotate 90 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::COUNTERCLOCKWISE).flip(true)
+      when 8 # Rotate 270 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::COUNTERCLOCKWISE)
+      end
+    rescue StandardError
+      # Ignore EXIF errors (no EXIF data, malformed, etc.)
+    end
+
+    pixbuf
   end
 
   def update_status_label(path)
