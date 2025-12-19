@@ -377,18 +377,29 @@ class ImageViewer < Gtk::Application
   end
 
   def apply_exif_rotation(pixbuf, path)
-    return pixbuf unless ['.jpg', '.jpeg', '.tiff'].include?(File.extname(path).downcase)
+    return pixbuf unless ['.jpg', '.jpeg', '.tiff', '.tif'].include?(File.extname(path).downcase)
 
     begin
-      data = Exif::Data.new(File.open(path))
-      orientation = data.orientation
+      # Fix: Open with File.open to handle non-ASCII paths correctly, and use block to auto-close
+      orientation = File.open(path) do |f|
+        data = Exif::Data.new(f)
+        data.orientation
+      end
       
       case orientation
-      when 3 # 180 degrees
+      when 2 # Mirror horizontal
+        pixbuf = pixbuf.flip(true)
+      when 3 # Rotate 180
         pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::UPSIDEDOWN)
-      when 6 # 90 degrees CW
+      when 4 # Mirror vertical
+        pixbuf = pixbuf.flip(false)
+      when 5 # Mirror horizontal and rotate 270 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::CLOCKWISE).flip(true)
+      when 6 # Rotate 90 CW
         pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::CLOCKWISE)
-      when 8 # 90 degrees CCW
+      when 7 # Mirror horizontal and rotate 90 CW
+        pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::COUNTERCLOCKWISE).flip(true)
+      when 8 # Rotate 270 CW
         pixbuf = pixbuf.rotate_simple(GdkPixbuf::PixbufRotation::COUNTERCLOCKWISE)
       end
     rescue StandardError
