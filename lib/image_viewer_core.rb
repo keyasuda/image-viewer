@@ -42,9 +42,9 @@ module ImageViewerCore
       if !force && File.exist?(path)
         current_content = File.read(path)
         current_hash = Digest::SHA256.hexdigest(current_content)
-        
+
         if @source_hash && current_hash != @source_hash
-          raise ConcurrentModificationError, "Metadata file has been modified by another process"
+          raise ConcurrentModificationError, 'Metadata file has been modified by another process'
         end
       end
 
@@ -176,10 +176,10 @@ module ImageViewerCore
 
       next_idx = find_next_index(@current_index)
       next_idx ||= find_next_index(-1) # Wrap around
-      if next_idx
-        @current_index = next_idx
-        current
-      end
+      return unless next_idx
+
+      @current_index = next_idx
+      current
     end
 
     def navigate_prev
@@ -187,10 +187,10 @@ module ImageViewerCore
 
       prev_idx = find_prev_index(@current_index)
       prev_idx ||= find_prev_index(@images.size) # Wrap around
-      if prev_idx
-        @current_index = prev_idx
-        current
-      end
+      return unless prev_idx
+
+      @current_index = prev_idx
+      current
     end
 
     def navigate_forward(steps)
@@ -229,15 +229,45 @@ module ImageViewerCore
       nil
     end
 
+    def navigate_next_all
+      return nil if @images.empty?
+
+      next_idx = (@current_index + 1) % @images.size
+      @current_index = next_idx
+      current
+    end
+
+    def navigate_prev_all
+      return nil if @images.empty?
+
+      @current_index = (@current_index - 1) % @images.size
+      current
+    end
+
+    def navigate_forward_all(steps)
+      return nil if @images.empty?
+
+      @current_index = (@current_index + steps) % @images.size
+      current
+    end
+
+    def navigate_backward_all(steps)
+      return nil if @images.empty?
+
+      @current_index = (@current_index - steps) % @images.size
+      @current_index += @images.size if @current_index < 0
+      current
+    end
+
     def navigate_next_pinned
       return nil if @images.empty?
 
       next_idx = find_next_pinned_index(@current_index)
       next_idx ||= find_next_pinned_index(-1) # Wrap around
-      if next_idx
-        @current_index = next_idx
-        current
-      end
+      return unless next_idx
+
+      @current_index = next_idx
+      current
     end
 
     def navigate_prev_pinned
@@ -245,10 +275,10 @@ module ImageViewerCore
 
       prev_idx = find_prev_pinned_index(@current_index)
       prev_idx ||= find_prev_pinned_index(@images.size) # Wrap around
-      if prev_idx
-        @current_index = prev_idx
-        current
-      end
+      return unless prev_idx
+
+      @current_index = prev_idx
+      current
     end
 
     def find_next_pinned_index(from_index)
@@ -261,6 +291,42 @@ module ImageViewerCore
     def find_prev_pinned_index(from_index)
       (from_index - 1).downto(0).each do |i|
         return i if @metadata.pinned?(File.basename(@images[i]))
+      end
+      nil
+    end
+
+    def navigate_next_skipped
+      return nil if @images.empty?
+
+      next_idx = find_next_skipped_index(@current_index)
+      next_idx ||= find_next_skipped_index(-1) # Wrap around
+      return unless next_idx
+
+      @current_index = next_idx
+      current
+    end
+
+    def navigate_prev_skipped
+      return nil if @images.empty?
+
+      prev_idx = find_prev_skipped_index(@current_index)
+      prev_idx ||= find_prev_skipped_index(@images.size) # Wrap around
+      return unless prev_idx
+
+      @current_index = prev_idx
+      current
+    end
+
+    def find_next_skipped_index(from_index)
+      ((from_index + 1)...@images.size).each do |i|
+        return i if @metadata.skipped?(File.basename(@images[i]))
+      end
+      nil
+    end
+
+    def find_prev_skipped_index(from_index)
+      (from_index - 1).downto(0).each do |i|
+        return i if @metadata.skipped?(File.basename(@images[i]))
       end
       nil
     end
@@ -290,11 +356,9 @@ module ImageViewerCore
       return if @images.empty?
 
       @images.delete_at(@current_index)
-      
+
       # Adjust current_index if we deleted the last item
-      if @current_index >= @images.size && !@images.empty?
-        @current_index = @images.size - 1
-      end
+      @current_index = @images.size - 1 if @current_index >= @images.size && !@images.empty?
     end
   end
 
