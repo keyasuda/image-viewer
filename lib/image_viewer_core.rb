@@ -240,9 +240,7 @@ module ImageViewerCore
     def navigate_prev_all
       return nil if @images.empty?
 
-      prev_idx = (@current_index - 1) % @images.size
-      prev_idx = @images.size - 1 if prev_idx < 0
-      @current_index = prev_idx
+      @current_index = (@current_index - 1) % @images.size
       current
     end
 
@@ -360,9 +358,7 @@ module ImageViewerCore
       @images.delete_at(@current_index)
 
       # Adjust current_index if we deleted the last item
-      return unless @current_index >= @images.size && !@images.empty?
-
-      @current_index = @images.size - 1
+      @current_index = @images.size - 1 if @current_index >= @images.size && !@images.empty?
     end
   end
 
