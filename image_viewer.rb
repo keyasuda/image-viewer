@@ -18,6 +18,7 @@ class ImageViewer < Gtk::Application
     @zoom_level = 1.0
     @fit_to_window = true
     @initial_file = nil
+    @show_skipped = false
 
     # Determine if path is a file or directory
     if path && File.file?(path)
@@ -142,9 +143,9 @@ class ImageViewer < Gtk::Application
   def setup_context_menu
     # Create a click controller to detect right-clicks
     click_ctrl = Gtk::GestureClick.new
-    click_ctrl.button = 3  # Right mouse button
+    click_ctrl.button = 3 # Right mouse button
 
-    click_ctrl.signal_connect('pressed') do |controller, _n_press, x, y|
+    click_ctrl.signal_connect('pressed') do |_controller, _n_press, x, y|
       menu = create_context_menu
       menu.pointing_to = Gdk::Rectangle.new(x.to_i, y.to_i, 1, 1)
       menu.parent = @image
@@ -219,7 +220,7 @@ class ImageViewer < Gtk::Application
 
   def add_action(action_group, name, &block)
     action = Gio::SimpleAction.new(name, nil)
-    action.signal_connect('activate') { |a, p| block.call }
+    action.signal_connect('activate') { |_a, _p| block.call }
     action_group.add_action(action)
   end
 
@@ -279,7 +280,7 @@ class ImageViewer < Gtk::Application
     if @initial_file
       # Lazy load: Show initial file immediately
       @image_list = ImageViewerCore::ImageList.new([@initial_file], @metadata)
-      
+
       # Load full list in background
       Thread.new do
         full_list = ImageViewerCore::ImageList.from_directory(@directory, @metadata, initial_file: @initial_file)
@@ -300,11 +301,9 @@ class ImageViewer < Gtk::Application
     # Preserve current file selection if possible
     current_file = @image_list.current
     @image_list = new_list
-    
+
     # Try to keep pointing to the same file, or fallback to what the new list has
-    if current_file
-      @image_list.jump_to_file(current_file)
-    end
+    @image_list.jump_to_file(current_file) if current_file
 
     # Update UI
     show_current_image
@@ -354,15 +353,13 @@ class ImageViewer < Gtk::Application
     return if next_idx.nil? || next_idx == @preload_index
 
     Thread.new do
-      begin
-        path = @image_list.images[next_idx]
-        pixbuf = GdkPixbuf::Pixbuf.new(file: path)
-        @preloaded_pixbuf = apply_exif_rotation(pixbuf, path)
-        @preload_index = next_idx
-      rescue StandardError
-        @preloaded_pixbuf = nil
-        @preload_index = nil
-      end
+      path = @image_list.images[next_idx]
+      pixbuf = GdkPixbuf::Pixbuf.new(file: path)
+      @preloaded_pixbuf = apply_exif_rotation(pixbuf, path)
+      @preload_index = next_idx
+    rescue StandardError
+      @preloaded_pixbuf = nil
+      @preload_index = nil
     end
   end
 
@@ -371,9 +368,10 @@ class ImageViewer < Gtk::Application
     position = "#{@image_list.current_index + 1}/#{@image_list.size}"
     dimensions = "#{pixbuf.width}x#{pixbuf.height}"
     zoom_info = @fit_to_window ? 'Fit' : "#{(@zoom_level * 100).to_i}%"
+    show_skipped_info = @show_skipped ? ' [SHOW SKIPPED]' : ''
     pin_skip_info = "📌#{@metadata.pinned_count} ⏭️#{@metadata.skipped_count}"
 
-    @info_bar.text = "#{filename} | #{position} | #{dimensions} | Zoom: #{zoom_info} | #{pin_skip_info}"
+    @info_bar.text = "#{filename} | #{position} | #{dimensions} | Zoom: #{zoom_info} | #{pin_skip_info}#{show_skipped_info}"
   end
 
   def apply_exif_rotation(pixbuf, path)
@@ -385,7 +383,7 @@ class ImageViewer < Gtk::Application
         data = Exif::Data.new(f)
         data.orientation
       end
-      
+
       case orientation
       when 2 # Mirror horizontal
         pixbuf = pixbuf.flip(true)
@@ -457,6 +455,14 @@ class ImageViewer < Gtk::Application
       end
     when 0x078, 0x058 # x, X
       mark_skipped
+    when 0x061, 0x041 # a, A
+      toggle_show_skipped
+    when 0x073, 0x053 # s, S
+      if shift
+        navigate_prev_skipped
+      else
+        navigate_next_skipped
+      end
     when 0x02b, 0x03d # plus, equal
       zoom_in
     when 0x02d # minus
@@ -479,49 +485,90 @@ class ImageViewer < Gtk::Application
   def navigate_next
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_next
-      show_current_image
-    end
+    result = if @show_skipped
+               @image_list.navigate_next_all
+             else
+               @image_list.navigate_next
+             end
+    return unless result
+
+    show_current_image
   end
 
   def navigate_prev
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_prev
-      show_current_image
-    end
+    result = if @show_skipped
+               @image_list.navigate_prev_all
+             else
+               @image_list.navigate_prev
+             end
+    return unless result
+
+    show_current_image
   end
 
   def navigate_forward(steps)
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_forward(steps)
-      show_current_image
-    end
+    result = if @show_skipped
+               @image_list.navigate_forward_all(steps)
+             else
+               @image_list.navigate_forward(steps)
+             end
+    return unless result
+
+    show_current_image
   end
 
   def navigate_backward(steps)
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_backward(steps)
-      show_current_image
-    end
+    result = if @show_skipped
+               @image_list.navigate_backward_all(steps)
+             else
+               @image_list.navigate_backward(steps)
+             end
+    return unless result
+
+    show_current_image
   end
 
   def navigate_next_pinned
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_next_pinned
-      show_current_image
-    end
+    return unless @image_list.navigate_next_pinned
+
+    show_current_image
   end
 
   def navigate_prev_pinned
     return if @image_list.nil? || @image_list.empty?
 
-    if @image_list.navigate_prev_pinned
-      show_current_image
-    end
+    return unless @image_list.navigate_prev_pinned
+
+    show_current_image
+  end
+
+  def navigate_next_skipped
+    return if @image_list.nil? || @image_list.empty?
+
+    return unless @image_list.navigate_next_skipped
+
+    show_current_image
+  end
+
+  def navigate_prev_skipped
+    return if @image_list.nil? || @image_list.empty?
+
+    return unless @image_list.navigate_prev_skipped
+
+    show_current_image
+  end
+
+  def toggle_show_skipped
+    @show_skipped = !@show_skipped
+    update_info_bar(@image_list.current, @current_pixbuf) if @image_list&.current && @current_pixbuf
   end
 
   def toggle_pinned
@@ -560,9 +607,7 @@ class ImageViewer < Gtk::Application
     )
 
     dialog.signal_connect('response') do |d, response|
-      if response == Gtk::ResponseType::YES
-        move_to_trash(current_file)
-      end
+      move_to_trash(current_file) if response == Gtk::ResponseType::YES
       d.destroy
     end
 
@@ -589,7 +634,7 @@ class ImageViewer < Gtk::Application
 
       # Show next image or close if no images left
       if @image_list.empty?
-        show_message_dialog("No more images in the directory.")
+        show_message_dialog('No more images in the directory.')
         @window.close
       else
         show_current_image
@@ -735,9 +780,7 @@ class ImageViewer < Gtk::Application
     )
 
     dialog.signal_connect('response') do |d, response|
-      if response == Gtk::ResponseType::YES
-        save_metadata(force: true)
-      end
+      save_metadata(force: true) if response == Gtk::ResponseType::YES
       d.destroy
     end
 
@@ -785,9 +828,7 @@ class ImageViewer < Gtk::Application
     )
 
     dialog.signal_connect('response') do |d, response|
-      if response == Gtk::ResponseType::YES
-        copy_pinned_files(dest_dir)
-      end
+      copy_pinned_files(dest_dir) if response == Gtk::ResponseType::YES
       d.destroy
     end
 
