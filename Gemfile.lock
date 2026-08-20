@@ -38,7 +38,7 @@ GEM
       atk (= 4.3.7)
       gdk4 (= 4.3.7)
       gsk4 (= 4.3.7)
-    json (2.21.1)
+    json (2.21.2)
     matrix (0.4.3)
     native-package-installer (1.1.9)
     pango (4.3.7)
