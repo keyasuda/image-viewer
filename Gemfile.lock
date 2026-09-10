@@ -38,7 +38,7 @@ GEM
       atk (= 4.3.9)
       gdk4 (= 4.3.9)
       gsk4 (= 4.3.9)
-    json (3.0.0)
+    json (3.0.2)
     matrix (0.4.3)
     native-package-installer (1.1.9)
     pango (4.3.9)
@@ -46,7 +46,7 @@ GEM
       gobject-introspection (= 4.3.9)
     pkg-config (1.6.5)
     rake (13.4.2)
-    red-colors (0.4.0)
+    red-colors (0.5.0)
       json
       matrix
     rspec (3.13.2)
@@ -58,10 +58,10 @@ GEM
     rspec-expectations (3.13.5)
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
-    rspec-mocks (3.13.7)
+    rspec-mocks (3.13.8)
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
-    rspec-support (3.13.6)
+    rspec-support (3.13.7)
 
 PLATFORMS
   ruby
